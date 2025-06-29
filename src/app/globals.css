@@ -45,13 +45,16 @@
 
 :root {
   --radius: 0.625rem;
+  --header-height: 3.5rem;
+  --sticky-offset: 2rem;
+  --sticky-top: calc(var(--header-height) + var(--sticky-offset));
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: hsl(153 47% 49%);
+  --primary: hsl(341, 100%, 72%);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -119,4 +122,9 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.container {
+  @apply mx-auto max-w-6xl px-4;
+  width: 100%;
 }

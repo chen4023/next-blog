@@ -1,29 +1,42 @@
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import Header from '@/components/layouts/Header';
-import Footer from '@/components/layouts/Footer';
+import { PostCard } from '@/components/features/blog/PostCard';
+import TagSection from './_components/TagSection';
+import ProfileSection from './_components/ProfileSection';
+import ContactSection from './_components/ContactSection';
+import Link from 'next/link';
+import Dropdown from '@/components/features/blog/Dropdown';
+import { mockMenu } from '@/mock/blog';
+import { getPublishedPosts } from '@/lib/notion';
+import { Post } from '@/types/blog';
 
-export default function Home() {
+export default async function Home() {
+  const posts: Post[] = await getPublishedPosts();
+
   return (
     // min-h-screen으로 전체 높이 보장, grid로 3개 영역 분할
-    <div className="container mx-auto px-4 py-8">
-      <div className="space-y-8">
-        {/* 섹션 제목 */}
-        <h2 className="text-3xl font-bold tracking-tight">블로그 목록</h2>
-        {/* 블로그 카드 그리드 */}
-        <div className="space-y-4">
-          {/* 블로그 카드 반복 */}
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <CardTitle>블로그 제목 {i}</CardTitle>
-                <CardDescription>
-                  이것은 블로그 포스트에 대한 간단한 설명입니다. 여러 줄의 텍스트가 있을 수
-                  있습니다.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          ))}
+    <div className="container py-8">
+      <div className="grid grid-cols-[200px_1fr_220px] gap-6">
+        {/*좌측 사이드바 */}
+        <TagSection />
+        <div className="space-y-8">
+          {/* 섹션 제목 */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-bold tracking-tight">HOME</h2>
+            <Dropdown menus={mockMenu} />
+          </div>
+          {/* 블로그 카드 그리드 */}
+          <div className="grid gap-4">
+            {posts.map((post) => (
+              <Link href={`/blog/${post.id}`} key={post.id}>
+                <PostCard post={post} />
+              </Link>
+            ))}
+          </div>
         </div>
+        {/*우측 사이드바 */}
+        <aside className="flex flex-col gap-6">
+          <ProfileSection />
+          <ContactSection />
+        </aside>
       </div>
     </div>
   );

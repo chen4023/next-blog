@@ -1,9 +1,9 @@
-export default function Blog() {
+export default function Projects() {
   return (
     <div className="container py-8">
       <div className="space-y-8">
         {/* 섹션 제목 */}
-        <h2 className="text-2xl font-bold tracking-tight">Blog</h2>
+        <h2 className="text-2xl font-bold tracking-tight">projects</h2>
         {/* 블로그 카드 그리드 */}
         <div className="space-y-4"></div>
       </div>
