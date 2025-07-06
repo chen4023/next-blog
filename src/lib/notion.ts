@@ -1,5 +1,5 @@
 import { Client } from '@notionhq/client';
-import { Post } from '@/types/blog';
+import { Post, TagFilterItem } from '@/types/blog';
 
 /**
  * Notion File Object에서 url 추출
@@ -25,7 +25,7 @@ function mapNotionToPost(notionPage: any): Post {
     author: props.Author.people[0]?.name ?? '',
     date: props.Date.date?.start ?? undefined,
     modifiedDate: props['Modified Date'].date?.start ?? undefined,
-    slug: props.Slug.rich_text[0]?.plain_text ?? '',
+    slug: props.Slug.rich_text[0]?.plain_text ?? props.id,
   };
 }
 
@@ -33,21 +33,150 @@ export const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
-export const getPublishedPosts = async (): Promise<Post[]> => {
+export const getPublishedPosts = async (tagFilter?: string): Promise<Post[]> => {
+  const baseFilter = {
+    property: 'Status',
+    select: {
+      equals: 'Published',
+    },
+  };
+
+  const filters = tagFilter
+    ? {
+        and: [
+          baseFilter,
+          {
+            property: 'Tags',
+            multi_select: {
+              contains: tagFilter,
+            },
+          },
+        ],
+      }
+    : baseFilter;
+
   const response = await notion.databases.query({
     database_id: process.env.NOTION_DATABASE_ID!,
-    filter: {
-      property: 'Status',
-      select: {
-        equals: 'Published',
-      },
-    },
+    filter: filters,
     sorts: [
       {
-        property: 'Modified Date',
+        property: 'Date',
         direction: 'descending',
       },
     ],
   });
   return response.results.map(mapNotionToPost);
+};
+
+/**
+ * 단일 포스트 조회 (slug 또는 id로)
+ */
+export const getPostBySlug = async (slug: string): Promise<Post | null> => {
+  try {
+    // 먼저 slug로 검색
+    const response = await notion.databases.query({
+      database_id: process.env.NOTION_DATABASE_ID!,
+      filter: {
+        and: [
+          {
+            property: 'Status',
+            select: {
+              equals: 'Published',
+            },
+          },
+          {
+            property: 'Slug',
+            rich_text: {
+              equals: slug,
+            },
+          },
+        ],
+      },
+    });
+
+    if (response.results.length === 0) {
+      // slug로 찾지 못한 경우 id로 검색
+      try {
+        const pageResponse = await notion.pages.retrieve({ page_id: slug });
+        const databaseResponse = await notion.databases.query({
+          database_id: process.env.NOTION_DATABASE_ID!,
+          filter: {
+            and: [
+              {
+                property: 'Status',
+                select: {
+                  equals: 'Published',
+                },
+              },
+              {
+                property: 'ID',
+                rich_text: {
+                  equals: slug,
+                },
+              },
+            ],
+          },
+        });
+
+        if (databaseResponse.results.length > 0) {
+          return mapNotionToPost(databaseResponse.results[0]);
+        }
+      } catch (error) {
+        console.error('Failed to retrieve post by ID:', error);
+      }
+
+      return null;
+    }
+
+    return mapNotionToPost(response.results[0]);
+  } catch (error) {
+    console.error('Failed to fetch post by slug:', error);
+    return null;
+  }
+};
+
+/**
+ * 모든 태그와 각 태그별 포스트 수 가져오기
+ */
+export const getTagStats = async (): Promise<TagFilterItem[]> => {
+  try {
+    const allPosts = await getPublishedPosts();
+
+    // 태그별 카운트 계산
+    const tagCounts: Record<string, number> = {};
+
+    allPosts.forEach((post) => {
+      post.tags?.forEach((tag) => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      });
+    });
+
+    // 전체 태그 추가
+    const tagStats: TagFilterItem[] = [
+      {
+        id: 'all',
+        name: '전체',
+        count: allPosts.length,
+      },
+      ...Object.entries(tagCounts)
+        .sort(([, a], [, b]) => b - a) // 포스트 수 기준 내림차순 정렬
+        .map(([name, count]) => ({
+          id: name.toLowerCase().replace(/\s+/g, '-'),
+          name,
+          count,
+        })),
+    ];
+
+    return tagStats;
+  } catch (error) {
+    console.error('Failed to fetch tag stats:', error);
+    // 에러 시 기본 태그 반환
+    return [
+      {
+        id: 'all',
+        name: '전체',
+        count: 0,
+      },
+    ];
+  }
 };
