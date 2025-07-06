@@ -1,4 +1,5 @@
 import { Client } from '@notionhq/client';
+import { NotionToMarkdown } from 'notion-to-md';
 import { Post, TagFilterItem } from '@/types/blog';
 
 /**
@@ -32,7 +33,9 @@ function mapNotionToPost(notionPage: any): Post {
 export const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 });
+const n2m = new NotionToMarkdown({ notionClient: notion });
 
+// 모든 포스트 조회
 export const getPublishedPosts = async (tagFilter?: string): Promise<Post[]> => {
   const baseFilter = {
     property: 'Status',
@@ -71,7 +74,9 @@ export const getPublishedPosts = async (tagFilter?: string): Promise<Post[]> => 
 /**
  * 단일 포스트 조회 (slug 또는 id로)
  */
-export const getPostBySlug = async (slug: string): Promise<Post | null> => {
+export const getPostBySlug = async (
+  slug: string
+): Promise<{ post: Post; content: string } | null> => {
   try {
     // 먼저 slug로 검색
     const response = await notion.databases.query({
@@ -93,42 +98,13 @@ export const getPostBySlug = async (slug: string): Promise<Post | null> => {
         ],
       },
     });
-
-    if (response.results.length === 0) {
-      // slug로 찾지 못한 경우 id로 검색
-      try {
-        const pageResponse = await notion.pages.retrieve({ page_id: slug });
-        const databaseResponse = await notion.databases.query({
-          database_id: process.env.NOTION_DATABASE_ID!,
-          filter: {
-            and: [
-              {
-                property: 'Status',
-                select: {
-                  equals: 'Published',
-                },
-              },
-              {
-                property: 'ID',
-                rich_text: {
-                  equals: slug,
-                },
-              },
-            ],
-          },
-        });
-
-        if (databaseResponse.results.length > 0) {
-          return mapNotionToPost(databaseResponse.results[0]);
-        }
-      } catch (error) {
-        console.error('Failed to retrieve post by ID:', error);
-      }
-
-      return null;
+    if (response.results.length > 0) {
+      const mdblocks = await n2m.pageToMarkdown(response.results[0].id);
+      const { parent } = n2m.toMarkdownString(mdblocks);
+      return { post: mapNotionToPost(response.results[0]), content: parent };
     }
 
-    return mapNotionToPost(response.results[0]);
+    return null;
   } catch (error) {
     console.error('Failed to fetch post by slug:', error);
     return null;

@@ -70,3 +70,50 @@ export function formatRelativeTime(date: Date | string | undefined): string {
     return '미상';
   }
 }
+
+/**
+ * 목차 항목 타입
+ */
+export interface TableOfContentsItem {
+  id: string;
+  text: string;
+  level: number;
+  children?: TableOfContentsItem[];
+}
+
+/**
+ * MDX 콘텐츠에서 목차를 추출하는 함수
+ */
+export function extractTableOfContents(content: string): TableOfContentsItem[] {
+  const headingRegex = /^(#{1,6})\s+(.+)$/gm;
+  const headings: TableOfContentsItem[] = [];
+  const usedIds = new Set<string>();
+
+  let match;
+  while ((match = headingRegex.exec(content)) !== null) {
+    const level = match[1].length;
+    const text = match[2].trim();
+    let id = text
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+
+    // 중복된 ID 처리
+    let counter = 1;
+    const originalId = id;
+    while (usedIds.has(id)) {
+      id = `${originalId}-${counter}`;
+      counter++;
+    }
+    usedIds.add(id);
+
+    headings.push({
+      id,
+      text,
+      level,
+    });
+  }
+
+  return headings;
+}

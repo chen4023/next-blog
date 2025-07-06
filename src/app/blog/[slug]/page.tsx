@@ -6,8 +6,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getPostBySlug, getPublishedPosts } from '@/lib/notion';
 import { notFound } from 'next/navigation';
-import { formatDateSimple } from '@/lib/utils';
+import { formatDateSimple, extractTableOfContents, type TableOfContentsItem } from '@/lib/utils';
 import Image from 'next/image';
+import { MDXRemote } from 'next-mdx-remote-client/rsc';
+import { TableOfContents } from '@/components/features/blog/TableOfContents';
+import { H1, H2, H3, H4, H5, H6 } from '@/components/features/blog/MDXComponents';
 
 interface BlogPostProps {
   params: Promise<{
@@ -17,12 +20,15 @@ interface BlogPostProps {
 
 export default async function BlogPost({ params }: BlogPostProps) {
   const { slug } = await params;
-  const post = await getPostBySlug(slug);
+  const result = await getPostBySlug(slug);
 
-  if (!post) {
+  if (!result) {
     notFound();
   }
-  console.log(post);
+  const { post, content } = result;
+
+  // 목차 추출
+  const tableOfContents = extractTableOfContents(content);
 
   // 이전/다음 포스트 가져오기
   const allPosts = await getPublishedPosts();
@@ -100,9 +106,17 @@ export default async function BlogPost({ params }: BlogPostProps) {
 
           {/* 블로그 본문 */}
           <div className="prose prose-slate dark:prose-invert max-w-none">
-            {post.description && (
-              <p className="lead text-xl text-muted-foreground">{post.description}</p>
-            )}
+            <MDXRemote
+              source={content}
+              components={{
+                h1: H1 as any,
+                h2: H2 as any,
+                h3: H3 as any,
+                h4: H4 as any,
+                h5: H5 as any,
+                h6: H6 as any,
+              }}
+            />
           </div>
           <Separator className="my-16" />
 
@@ -142,34 +156,10 @@ export default async function BlogPost({ params }: BlogPostProps) {
           </nav>
         </section>
 
-        {/* 사이드바 */}
+        {/* 목차 사이드바 */}
         <aside className="relative">
           <div className="sticky top-[var(--sticky-top)]">
-            <div className="bg-muted/30 space-y-4 rounded-lg p-6 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold">포스트 정보</h3>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-muted-foreground">작성자:</span>
-                  <p className="font-medium">{post.author || '미상'}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">작성일:</span>
-                  <p className="font-medium">{formatDateSimple(post.date)}</p>
-                </div>
-                {post.tags && post.tags.length > 0 && (
-                  <div>
-                    <span className="text-muted-foreground">태그:</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {post.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <TableOfContents tableOfContents={tableOfContents} post={post} />
           </div>
         </aside>
       </div>
